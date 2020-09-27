@@ -45,6 +45,24 @@ namespace ChatData.Controllers
             }
         }
 
+        // GET api/RoomsData/id
+        [HttpGet("{id}")]
+        public async Task<IActionResult> Get(string id)
+        {
+            IReliableDictionary<string, RoomData> roomsDict = await this.stateManager.GetOrAddAsync<IReliableDictionary<string, RoomData>>(ROOMS);
+
+            using (ITransaction tx = this.stateManager.CreateTransaction())
+            {
+                if (!await roomsDict.ContainsKeyAsync(tx, id))
+                {
+                    return new NoContentResult();
+                }
+
+                var result = await roomsDict.TryGetValueAsync(tx, id);
+                return this.Json(result.Value);
+            }
+        }
+
         // PUT api/RoomsData
         [HttpPut]
         public async Task<IActionResult> Put([FromBody] RoomData room)
@@ -53,32 +71,11 @@ namespace ChatData.Controllers
 
             using (ITransaction tx = this.stateManager.CreateTransaction())
             {
-                await roomsDict.AddAsync(tx, room.Id, room);
+                await roomsDict.AddOrUpdateAsync(tx, room.Id, room, (key, oldvalue) => room);
                 await tx.CommitAsync();
             }
 
             return this.Json(room);
-        }
-
-        // DELETE api/RoomsData/id
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(string id)
-        {
-            IReliableDictionary<string, RoomData> roomsDict = await this.stateManager.GetOrAddAsync<IReliableDictionary<string, RoomData>>(ROOMS);
-
-            using (ITransaction tx = this.stateManager.CreateTransaction())
-            {
-                if (await roomsDict.ContainsKeyAsync(tx, id))
-                {
-                    await roomsDict.TryRemoveAsync(tx, id);
-                    await tx.CommitAsync();
-                    return new OkResult();
-                }
-                else
-                {
-                    return new NotFoundResult();
-                }
-            }
         }
     }
 }

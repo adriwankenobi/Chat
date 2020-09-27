@@ -3,28 +3,31 @@ using System.Runtime.Serialization;
 
 namespace ChatData.Models
 {
-
     [DataContract]
-    public class RoomData
+    public class MessageData
     {
         [DataMember]
         public string Id { get; set; }
 
         [DataMember]
-        public string Name { get; set; }
+        public string SenderId { get; set; }
+
+        [DataMember]
+        public string RoomId { get; set; }
 
         [DataMember]
         public DateTime CreatedAt { get; set; }
 
         [DataMember]
-        public bool IsDeleted { get; set; }
+        public string Content { get; set; }
 
-        public RoomData(string name)
+        public MessageData(string senderId, string roomId, string content)
         {
             this.Id = Guid.NewGuid().ToString();
-            this.Name = name;
+            this.SenderId = senderId;
+            this.RoomId = roomId;
             this.CreatedAt = DateTime.Now;
-            this.IsDeleted = false;
+            this.Content = content;
         }
     }
 }

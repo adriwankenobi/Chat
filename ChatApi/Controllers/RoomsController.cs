@@ -51,9 +51,14 @@ namespace ChatApi.Controllers
                     {
                         continue;
                     }
-
-                    result.AddRange(JsonConvert.DeserializeObject<List<RoomData>>(await response.Content.ReadAsStringAsync()));
+     
+                    result.AddRange(JsonConvert.DeserializeObject<List<RoomData>>(await response.Content.ReadAsStringAsync()).Where(r => !r.IsDeleted));
                 }
+            }
+
+            if (result.Count <= 0)
+            {
+                return new NoContentResult();
             }
 
             return this.Json(result);
@@ -63,6 +68,13 @@ namespace ChatApi.Controllers
         [HttpPut("")]
         public async Task<IActionResult> Put([FromBody] RoomData room)
         {
+            if (String.IsNullOrEmpty(room.Name))
+            {
+                return new BadRequestResult();
+            }
+
+            room = new RoomData(room.Name);
+
             Uri serviceName = ChatApi.GetChatDataServiceName(this.serviceContext);
             Uri proxyAddress = this.GetProxyAddress(serviceName);
             long partitionKey = this.GetPartitionKey(room.Id);
@@ -85,12 +97,44 @@ namespace ChatApi.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
+            if (String.IsNullOrEmpty(id))
+            {
+                return new BadRequestResult();
+            }
+
             Uri serviceName = ChatApi.GetChatDataServiceName(this.serviceContext);
             Uri proxyAddress = this.GetProxyAddress(serviceName);
             long partitionKey = this.GetPartitionKey(id);
             string proxyUrl = $"{proxyAddress}/api/RoomsData/{id}?PartitionKey={partitionKey}&PartitionKind=Int64Range";
 
-            using (HttpResponseMessage response = await this.httpClient.DeleteAsync(proxyUrl))
+            RoomData room;
+            using (HttpResponseMessage response = await this.httpClient.GetAsync(proxyUrl))
+            {
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+                    {
+                        return new NotFoundResult();
+                    }
+                    return this.StatusCode((int)response.StatusCode);
+                }
+
+                room = JsonConvert.DeserializeObject<RoomData>(await response.Content.ReadAsStringAsync());
+            }
+
+            if (room.IsDeleted)
+            {
+                return new NotFoundResult();
+            }
+
+            room.IsDeleted = true;
+
+            proxyUrl = $"{proxyAddress}/api/RoomsData?PartitionKey={partitionKey}&PartitionKind=Int64Range";
+
+            StringContent putContent = new StringContent(JsonConvert.SerializeObject(room, Formatting.Indented), Encoding.UTF8, "application/json");
+            putContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+            using (HttpResponseMessage response = await this.httpClient.PutAsync(proxyUrl, putContent))
             {
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
