@@ -20,7 +20,7 @@
                                     AzureActiveDirectory="true"
                                     ServerCertThumbprint="0123456789012345678901234567890123456789" />
   -->
-  <ClusterConnectionParameters ConnectionEndpoint="" />
+  <ClusterConnectionParameters ConnectionEndpoint="ngcluster.northeurope.cloudapp.azure.com:19000" X509Credential="true" ServerCertThumbprint="05FA4B44B679068F46DA11C956BFE9A6116ACB0C" FindType="FindByThumbprint" FindValue="05FA4B44B679068F46DA11C956BFE9A6116ACB0C" StoreLocation="CurrentUser" StoreName="My" />
   <ApplicationParameterFile Path="..\ApplicationParameters\Cloud.xml" />
   <CopyPackageParameters CompressPackage="true" />
 </PublishProfile>

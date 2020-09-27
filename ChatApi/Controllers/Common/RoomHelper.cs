@@ -34,10 +34,6 @@ namespace ChatApi.Controllers.Common
                 }
 
                 room = JsonConvert.DeserializeObject<RoomData>(await response.Content.ReadAsStringAsync());
-                if (room.IsDeleted)
-                {
-                    return new RoomResult() { Result = new NotFoundResult() };
-                }
             }
 
             return new RoomResult() { Room = room }; ;

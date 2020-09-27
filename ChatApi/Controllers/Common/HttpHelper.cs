@@ -8,6 +8,8 @@ namespace ChatApi.Controllers.Common
     public static class HttpHelper
     {
 
+        public const string USERS_API = "/api/UsersData";
+        public const string CONNECTED_USERS_API = "/api/ConnectedUsersData";
         public const string ROOMS_API = "/api/RoomsData";
         public const string MESSAGES_API = "/api/MessagesData";
 

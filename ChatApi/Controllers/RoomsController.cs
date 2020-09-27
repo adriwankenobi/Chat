@@ -28,10 +28,17 @@ namespace ChatApi.Controllers
             this.serviceContext = context;
         }
 
-        // GET: api/rooms
+        // List all rooms
+        // GET: api/rooms?id=id
         [HttpGet("")]
-        public async Task<IActionResult> Get()
+        public async Task<IActionResult> Get([FromQuery] string id)
         {
+            var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
+            if (res != null)
+            {
+                return res;
+            }
+
             Uri proxyAddress = PartitionHelper.GetProxyAddress(this.serviceContext);
             ServicePartitionList partitions = await PartitionHelper.GetAllPartitions(this.serviceContext, this.fabricClient);
 
@@ -48,7 +55,7 @@ namespace ChatApi.Controllers
                         continue;
                     }
      
-                    result.AddRange(JsonConvert.DeserializeObject<List<RoomData>>(await response.Content.ReadAsStringAsync()).Where(r => !r.IsDeleted));
+                    result.AddRange(JsonConvert.DeserializeObject<List<RoomData>>(await response.Content.ReadAsStringAsync()));
                 }
             }
 
@@ -60,10 +67,17 @@ namespace ChatApi.Controllers
             return this.Json(result);
         }
 
-        // PUT: api/rooms
+        // Create a room
+        // PUT: api/rooms?id=id
         [HttpPut("")]
-        public async Task<IActionResult> Put([FromBody] RoomData room)
+        public async Task<IActionResult> Put([FromQuery] string id, [FromBody] RoomData room)
         {
+            var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
+            if (res != null)
+            {
+                return res;
+            }
+
             if (String.IsNullOrEmpty(room.Name))
             {
                 return new BadRequestResult();
@@ -84,24 +98,41 @@ namespace ChatApi.Controllers
             }
         }
 
-        // DELETE: api/rooms/id
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(string id)
+        // Join a room
+        // PUT: api/rooms/roomId?id=id
+        [HttpPut("{roomId}")]
+        public async Task<IActionResult> Put([FromQuery] string id, string roomId)
         {
-            if (String.IsNullOrEmpty(id))
+            var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
+            if (res != null)
+            {
+                return res;
+            }
+
+            if (String.IsNullOrEmpty(roomId))
             {
                 return new BadRequestResult();
             }
 
-            var result = await RoomHelper.RoomExists(this.serviceContext, this.httpClient, this.StatusCode, id);
+            var result = await RoomHelper.RoomExists(this.serviceContext, this.httpClient, this.StatusCode, roomId);
             if (result.Result != null)
             {
                 return result.Result;
             }
 
-            result.Room.IsDeleted = true;
+            if (result.Room.Members.Count >= 20)
+            {
+                return new ContentResult()
+                {
+                    StatusCode = (int)System.Net.HttpStatusCode.OK,
+                    Content = "Room is full"
+                };
+            }
 
-            string proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, $"{HttpHelper.ROOMS_API}", id);
+            // Add user to the room
+            result.Room.Members.Add(id);
+
+            string proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, HttpHelper.ROOMS_API, roomId);
             StringContent putContent = HttpHelper.GetJSONContent(result.Room);
 
             using (HttpResponseMessage response = await this.httpClient.PutAsync(proxyUrl, putContent))
@@ -112,7 +143,96 @@ namespace ChatApi.Controllers
                 }
             }
 
-            return new OkResult();
+            // Add room to user list
+            proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, $"{HttpHelper.USERS_API}/{id}", id);
+
+            UserData user;
+            using (HttpResponseMessage response = await this.httpClient.GetAsync(proxyUrl))
+            {
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    return this.StatusCode((int)response.StatusCode);
+                }
+                user = JsonConvert.DeserializeObject<UserData>(await response.Content.ReadAsStringAsync());
+            }
+
+            user.Rooms.Add(roomId);
+
+            proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, HttpHelper.USERS_API, user.Id);
+            putContent = HttpHelper.GetJSONContent(user);
+
+            using (HttpResponseMessage response = await this.httpClient.PutAsync(proxyUrl, putContent))
+            {
+                return new ContentResult()
+                {
+                    StatusCode = (int)response.StatusCode,
+                    Content = await response.Content.ReadAsStringAsync()
+                };
+            }
+        }
+
+        // Leave a room
+        // DELETE: api/rooms/roomId?id=id
+        [HttpDelete("{roomId}")]
+        public async Task<IActionResult> Delete([FromQuery] string id, string roomId)
+        {
+            var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
+            if (res != null)
+            {
+                return res;
+            }
+
+            if (String.IsNullOrEmpty(roomId))
+            {
+                return new BadRequestResult();
+            }
+
+            var result = await RoomHelper.RoomExists(this.serviceContext, this.httpClient, this.StatusCode, roomId);
+            if (result.Result != null)
+            {
+                return result.Result;
+            }
+
+            // Remove user from the room
+            result.Room.Members.Remove(id);
+
+            string proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, HttpHelper.ROOMS_API, roomId);
+            StringContent putContent = HttpHelper.GetJSONContent(result.Room);
+
+            using (HttpResponseMessage response = await this.httpClient.PutAsync(proxyUrl, putContent))
+            {
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    return this.StatusCode((int)response.StatusCode);
+                }
+            }
+
+            // Remove room from user list
+            proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, $"{HttpHelper.USERS_API}/{id}", id);
+
+            UserData user;
+            using (HttpResponseMessage response = await this.httpClient.GetAsync(proxyUrl))
+            {
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    return this.StatusCode((int)response.StatusCode);
+                }
+                user = JsonConvert.DeserializeObject<UserData>(await response.Content.ReadAsStringAsync());
+            }
+
+            user.Rooms.Remove(roomId);
+
+            proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, HttpHelper.USERS_API, user.Id);
+            putContent = HttpHelper.GetJSONContent(user);
+
+            using (HttpResponseMessage response = await this.httpClient.PutAsync(proxyUrl, putContent))
+            {
+                return new ContentResult()
+                {
+                    StatusCode = (int)response.StatusCode,
+                    Content = await response.Content.ReadAsStringAsync()
+                };
+            }
         }
     }
 }

@@ -6,7 +6,7 @@ namespace ChatData.Models
 {
 
     [DataContract]
-    public class RoomData
+    public class UserData
     {
         [DataMember]
         public string Id { get; set; }
@@ -15,17 +15,21 @@ namespace ChatData.Models
         public string Name { get; set; }
 
         [DataMember]
-        public DateTime CreatedAt { get; set; }
+        public DateTime RegisteredAt { get; set; }
 
         [DataMember]
-        public HashSet<string> Members { get; set; }
+        public DateTime LastLoginAt { get; set; }
 
-        public RoomData(string name)
+        [DataMember]
+        public HashSet<string> Rooms { get; set; }
+
+        public UserData(string name)
         {
             this.Id = Guid.NewGuid().ToString();
             this.Name = name;
-            this.CreatedAt = DateTime.Now;
-            this.Members = new HashSet<string>();
+            this.RegisteredAt = DateTime.Now;
+            this.LastLoginAt = DateTime.Now;
+            this.Rooms = new HashSet<string>();
         }
     }
 }

@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Fabric;
+using System.Linq.Expressions;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using ChatApi.Controllers.Common;
 using ChatData.Models;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 
 namespace ChatApi.Controllers
 {
@@ -24,22 +27,33 @@ namespace ChatApi.Controllers
             this.serviceContext = context;
         }
 
-        // GET: api/rooms/id
-        [HttpGet("{id}")]
-        public async Task<IActionResult> Get(string id)
+        // GET: api/rooms/roomId?id=id
+        [HttpGet("{roomId}")]
+        public async Task<IActionResult> Get([FromQuery] string id, string roomId)
         {
-            if (String.IsNullOrEmpty(id))
+            var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
+            if (res != null)
+            {
+                return res;
+            }
+
+            if (String.IsNullOrEmpty(roomId))
             {
                 return new BadRequestResult();
             }
 
-            var result = await RoomHelper.RoomExists(this.serviceContext, this.httpClient, this.StatusCode, id);
+            var result = await RoomHelper.RoomExists(this.serviceContext, this.httpClient, this.StatusCode, roomId);
             if (result.Result != null)
             {
                 return result.Result;
             }
 
-            string proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, $"{HttpHelper.MESSAGES_API}/{id}", id);
+            if (!result.Room.Members.Contains(id))
+            {
+                return new UnauthorizedResult();
+            }
+
+            string proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, $"{HttpHelper.MESSAGES_API}/{roomId}", roomId);
 
             using (HttpResponseMessage response = await this.httpClient.GetAsync(proxyUrl))
             {
@@ -49,37 +63,73 @@ namespace ChatApi.Controllers
                     Content = await response.Content.ReadAsStringAsync()
                 };
             }
+
+            
         }
 
-        // POST: api/rooms/id
-        [HttpPost("{id}")]
-        public async Task<IActionResult> Post(string id, [FromBody] MessageData msg)
+        // POST: api/rooms/roomId?id=id
+        [HttpPost("{roomId}")]
+        public async Task<IActionResult> Post([FromQuery] string id, string roomId, [FromBody] MessageData msg)
         {
-            if (String.IsNullOrEmpty(id) || (!String.IsNullOrEmpty(msg.RoomId) && id != msg.RoomId) ||
-                String.IsNullOrEmpty(msg.SenderId) || String.IsNullOrEmpty(msg.Content))
+            var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
+            if (res != null)
+            {
+                return res;
+            }
+
+            if (String.IsNullOrEmpty(roomId) || (!String.IsNullOrEmpty(msg.RoomId) && roomId != msg.RoomId) ||
+                String.IsNullOrEmpty(msg.Content))
             {
                 return new BadRequestResult();
             }
 
-            var result = await RoomHelper.RoomExists(this.serviceContext, this.httpClient, this.StatusCode, id);
+            var result = await RoomHelper.RoomExists(this.serviceContext, this.httpClient, this.StatusCode, roomId);
             if (result.Result != null)
             {
                 return result.Result;
             }
 
-            msg = new MessageData(msg.SenderId, id, msg.Content);
+            if (!result.Room.Members.Contains(id))
+            {
+                return new UnauthorizedResult();
+            }
 
-            string proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, $"{HttpHelper.MESSAGES_API}", id);
+            msg = new MessageData(id, roomId, msg.Content);
+
+            string proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, HttpHelper.MESSAGES_API, roomId);
             StringContent postContent = HttpHelper.GetJSONContent(msg);
 
             using (HttpResponseMessage response = await this.httpClient.PostAsync(proxyUrl, postContent))
             {
-                return new ContentResult()
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    StatusCode = (int)response.StatusCode,
-                    Content = await response.Content.ReadAsStringAsync()
-                };
+                    return this.StatusCode((int)response.StatusCode);
+                }
             }
+
+            // Broadcast message to online members
+            foreach (string member in result.Room.Members)
+            {
+                proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, $"{HttpHelper.CONNECTED_USERS_API}/{member}", member);
+
+                using (HttpResponseMessage response = await httpClient.GetAsync(proxyUrl))
+                {
+                    if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                    {
+                        continue;
+                    }
+                    var user = JsonConvert.DeserializeObject<ConnectedUserData>(await response.Content.ReadAsStringAsync());
+
+                    // TODO: Send message to connected user
+                    Console.WriteLine($"Sending message to: {user.Ip}");
+                }
+            }
+
+            return new ContentResult()
+            {
+                StatusCode = (int)System.Net.HttpStatusCode.OK,
+                Content = JsonConvert.SerializeObject(msg, Formatting.Indented)
+            };
         }
     }
 }
