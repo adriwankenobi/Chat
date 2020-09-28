@@ -1,9 +1,16 @@
 # Chat
 Small chat app to test .NET Service Fabric
 
-Hosted in Azure in 
+Hosted in Azure. Endpoint:
 ```
 http://ngcluster.northeurope.cloudapp.azure.com:8080/
+```
+
+# Test client
+
+I made a small client in Python to test the chat app
+```sh
+$ ./ChatClient/chatclient.py <server>
 ```
 
 # Useful commands for testing the API
