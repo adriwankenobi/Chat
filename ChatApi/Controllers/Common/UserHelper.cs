@@ -11,23 +11,32 @@ namespace ChatApi.Controllers.Common
     public static class UserHelper
     {
 
-        public static async Task<IActionResult> IsUserAuthorized(ServiceContext context, HttpClient httpClient, string id)
+        public class ConnectedUser
+        {
+            public IActionResult Result { get; set; }
+            public ConnectedUserData User { get; set; }
+        }
+
+        public static async Task<ConnectedUser> IsUserAuthorized(ServiceContext context, HttpClient httpClient, string id)
         {
             if (String.IsNullOrEmpty(id))
             {
-                return new UnauthorizedResult();
+                new ConnectedUser() { Result = new UnauthorizedResult() };
             }
 
+            ConnectedUserData user;
             string proxyUrl = PartitionHelper.GetProxyUrl(context, $"{HttpHelper.CONNECTED_USERS_API}/{id}", id);
             using (HttpResponseMessage response = await httpClient.GetAsync(proxyUrl))
             {
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    return new UnauthorizedResult();
+                    new ConnectedUser() { Result = new UnauthorizedResult() };
                 }
+
+                user = JsonConvert.DeserializeObject<ConnectedUserData>(await response.Content.ReadAsStringAsync());
             }
 
-            return null;
+            return new ConnectedUser() { User = user }; ;
         }
 
     }

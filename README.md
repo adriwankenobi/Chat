@@ -60,4 +60,4 @@ Add authentication and request validation in middle layers using annotations
 
 Unit tests for API calls
 
-Broadcast messages to connected users on posting
+Add a listener service that handles connected users and broadcasts messages on posting

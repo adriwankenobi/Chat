@@ -34,9 +34,9 @@ namespace ChatApi.Controllers
         public async Task<IActionResult> Get([FromQuery] string id)
         {
             var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
-            if (res != null)
+            if (res.Result != null)
             {
-                return res;
+                return res.Result;
             }
 
             Uri proxyAddress = PartitionHelper.GetProxyAddress(this.serviceContext);
@@ -73,9 +73,9 @@ namespace ChatApi.Controllers
         public async Task<IActionResult> Put([FromQuery] string id, [FromBody] RoomData room)
         {
             var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
-            if (res != null)
+            if (res.Result != null)
             {
-                return res;
+                return res.Result;
             }
 
             if (String.IsNullOrEmpty(room.Name))
@@ -104,9 +104,9 @@ namespace ChatApi.Controllers
         public async Task<IActionResult> Put([FromQuery] string id, string roomId)
         {
             var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
-            if (res != null)
+            if (res.Result != null)
             {
-                return res;
+                return res.Result;
             }
 
             if (String.IsNullOrEmpty(roomId))
@@ -177,9 +177,9 @@ namespace ChatApi.Controllers
         public async Task<IActionResult> Delete([FromQuery] string id, string roomId)
         {
             var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
-            if (res != null)
+            if (res.Result != null)
             {
-                return res;
+                return res.Result;
             }
 
             if (String.IsNullOrEmpty(roomId))

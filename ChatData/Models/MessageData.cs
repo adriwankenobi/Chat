@@ -13,6 +13,9 @@ namespace ChatData.Models
         public string SenderId { get; set; }
 
         [DataMember]
+        public string SenderName { get; set; }
+
+        [DataMember]
         public string RoomId { get; set; }
 
         [DataMember]
@@ -21,10 +24,11 @@ namespace ChatData.Models
         [DataMember]
         public string Content { get; set; }
 
-        public MessageData(string senderId, string roomId, string content)
+        public MessageData(string senderId, string senderName, string roomId, string content)
         {
             this.Id = Guid.NewGuid().ToString();
             this.SenderId = senderId;
+            this.SenderName = senderName;
             this.RoomId = roomId;
             this.CreatedAt = DateTime.Now;
             this.Content = content;

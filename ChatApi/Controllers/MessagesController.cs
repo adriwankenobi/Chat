@@ -32,9 +32,9 @@ namespace ChatApi.Controllers
         public async Task<IActionResult> Get([FromQuery] string id, string roomId)
         {
             var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
-            if (res != null)
+            if (res.Result != null)
             {
-                return res;
+                return res.Result;
             }
 
             if (String.IsNullOrEmpty(roomId))
@@ -72,9 +72,9 @@ namespace ChatApi.Controllers
         public async Task<IActionResult> Post([FromQuery] string id, string roomId, [FromBody] MessageData msg)
         {
             var res = await UserHelper.IsUserAuthorized(this.serviceContext, this.httpClient, id);
-            if (res != null)
+            if (res.Result != null)
             {
-                return res;
+                return res.Result;
             }
 
             if (String.IsNullOrEmpty(roomId) || (!String.IsNullOrEmpty(msg.RoomId) && roomId != msg.RoomId) ||
@@ -94,7 +94,7 @@ namespace ChatApi.Controllers
                 return new UnauthorizedResult();
             }
 
-            msg = new MessageData(id, roomId, msg.Content);
+            msg = new MessageData(id, res.User.Name, roomId, msg.Content);
 
             string proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, HttpHelper.MESSAGES_API, roomId);
             StringContent postContent = HttpHelper.GetJSONContent(msg);

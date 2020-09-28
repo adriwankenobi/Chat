@@ -63,7 +63,7 @@ namespace ChatApi.Controllers
             // Set as connected user
             string remoteAddress = $"{this.HttpContext.Connection.RemoteIpAddress}:{this.HttpContext.Connection.RemotePort}";
             string proxyUrl = PartitionHelper.GetProxyUrl(this.serviceContext, HttpHelper.CONNECTED_USERS_API, user.Id);
-            StringContent putContent = HttpHelper.GetJSONContent(new ConnectedUserData(user.Id, remoteAddress));
+            StringContent putContent = HttpHelper.GetJSONContent(new ConnectedUserData(user.Id, user.Name, remoteAddress));
 
             using (HttpResponseMessage response = await this.httpClient.PutAsync(proxyUrl, putContent))
             {
